@@ -1,10 +1,10 @@
 bl_info = {
     "name": "Batch Material Helper",
-    "author": "Grok3-maylog",
-    "version": (1, 0, 1), 
-    "blender": (4, 4, 0),
+    "author": "maylog",
+    "version": (1, 0, 2), 
+    "blender": (4, 2, 0),
     "location": "View3D > Sidebar > Material",
-    "description": "Batch adjust material and BSDF properties for selected objects",
+    "description": "Batch adjust material and BSDF properties for selected objects, including emission, coat, sheen, transmission, and subsurface",
     "category": "Material",
 }
 
@@ -12,16 +12,14 @@ import bpy
 from bpy.types import Operator, Panel, PropertyGroup
 from bpy.props import FloatProperty, FloatVectorProperty, BoolProperty, EnumProperty
 
-# 定义 PropertyGroup 来收集所有属性
+# Define PropertyGroup to hold all properties
 class BatchMaterialProperties(PropertyGroup):
-    # BSDF 属性
+    # BSDF Properties
     batch_base_color: FloatVectorProperty(
         name="Base Color",
         description="Base color for Principled BSDF",
         subtype='COLOR',
         default=(1.0, 1.0, 1.0, 1.0),
-        min=0.0,
-        max=1.0,
         size=4
     )
     use_base_color: BoolProperty(
@@ -89,7 +87,82 @@ class BatchMaterialProperties(PropertyGroup):
         description="Apply IOR Level to selected objects",
         default=False
     )
-    # 材质设置
+    batch_emission_color: FloatVectorProperty(
+        name="Emission Color",
+        description="Emission color for Principled BSDF",
+        subtype='COLOR',
+        default=(1.0, 1.0, 1.0, 1.0),
+        size=4
+    )
+    use_emission_color: BoolProperty(
+        name="Use Emission Color",
+        description="Apply Emission Color to selected objects",
+        default=False
+    )
+    batch_emission_strength: FloatProperty(
+        name="Emission Strength",
+        description="Value to set for emission strength property",
+        default=0.0,
+        min=0.0
+    )
+    use_emission_strength: BoolProperty(
+        name="Use Emission Strength",
+        description="Apply Emission Strength to selected objects",
+        default=False
+    )
+    # New: Coat Weight
+    batch_coat_weight: FloatProperty(
+        name="Coat Weight",
+        description="Value to set for coat weight property",
+        default=0.0,
+        min=0.0,
+        max=1.0
+    )
+    use_coat_weight: BoolProperty(
+        name="Use Coat Weight",
+        description="Apply Coat Weight to selected objects",
+        default=False
+    )
+    # New: Sheen Weight
+    batch_sheen_weight: FloatProperty(
+        name="Sheen Weight",
+        description="Value to set for sheen weight property",
+        default=0.0,
+        min=0.0,
+        max=1.0
+    )
+    use_sheen_weight: BoolProperty(
+        name="Use Sheen Weight",
+        description="Apply Sheen Weight to selected objects",
+        default=False
+    )
+    # New: Transmission Weight
+    batch_transmission_weight: FloatProperty(
+        name="Transmission Weight",
+        description="Value to set for transmission weight property",
+        default=0.0,
+        min=0.0,
+        max=1.0
+    )
+    use_transmission_weight: BoolProperty(
+        name="Use Transmission Weight",
+        description="Apply Transmission Weight to selected objects",
+        default=False
+    )
+    # New: Subsurface Weight
+    batch_subsurface_weight: FloatProperty(
+        name="Subsurface Weight",
+        description="Value to set for subsurface weight property",
+        default=0.0,
+        min=0.0,
+        max=1.0
+    )
+    use_subsurface_weight: BoolProperty(
+        name="Use Subsurface Weight",
+        description="Apply Subsurface Weight to selected objects",
+        default=False
+    )
+    # Material Settings
     batch_render_method: EnumProperty(
         name="Render Method",
         description="Surface render method for materials",
@@ -159,14 +232,12 @@ class BatchMaterialProperties(PropertyGroup):
         description="Apply Raytrace Transmission to selected objects",
         default=False
     )
-    # 视图显示
+    # Viewport Display
     batch_diffuse_color: FloatVectorProperty(
         name="Diffuse Color",
         description="Viewport display color",
         subtype='COLOR',
         default=(0.8, 0.8, 0.8, 1.0),
-        min=0.0,
-        max=1.0,
         size=4
     )
     use_diffuse_color: BoolProperty(
@@ -206,22 +277,32 @@ class MATERIAL_OT_batch_material_helper(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        if bpy.app.version < (2, 93, 0):
+            self.report({'WARNING'}, "Emission, Coat, Sheen, Transmission, and Subsurface properties require Blender 2.93 or higher")
+            return {'CANCELLED'}
+
         props = context.scene.batch_material_props
-        # BSDF 属性
+        # BSDF Properties
         base_color = props.batch_base_color
         metallic_value = props.batch_metallic_value
         roughness_value = props.batch_roughness_value
         ior_value = props.batch_ior_value
         alpha_value = props.batch_alpha_value
         ior_level_value = props.batch_ior_level_value
-        # 材质设置
+        emission_color = props.batch_emission_color
+        emission_strength = props.batch_emission_strength
+        coat_weight = props.batch_coat_weight
+        sheen_weight = props.batch_sheen_weight
+        transmission_weight = props.batch_transmission_weight
+        subsurface_weight = props.batch_subsurface_weight
+        # Material Settings
         render_method = props.batch_render_method
         displacement_method = props.batch_displacement_method
         backface_culling = props.batch_backface_culling
         backface_culling_shadow = props.batch_backface_culling_shadow
         backface_culling_lightprobe = props.batch_backface_culling_lightprobe
         transparent_shadow = props.batch_transparent_shadow
-        # 视图显示
+        # Viewport Display
         diffuse_color = props.batch_diffuse_color
         display_metallic = props.batch_display_metallic
         display_roughness = props.batch_display_roughness
@@ -234,11 +315,11 @@ class MATERIAL_OT_batch_material_helper(Operator):
 
         applied_properties = []
         for obj in selected_objects:
-            if obj.material_slots:  # 支持所有有材质槽的物体类型
+            if obj.material_slots:  # Support all object types with material slots
                 for mat_slot in obj.material_slots:
                     material = mat_slot.material
                     if material:
-                        # 材质设置（独立于 BSDF）
+                        # Material Settings (independent of BSDF)
                         if props.use_render_method:
                             material.surface_render_method = render_method
                             applied_properties.append(f"Render Method={render_method}")
@@ -257,7 +338,7 @@ class MATERIAL_OT_batch_material_helper(Operator):
                         if props.use_transparent_shadow:
                             material.use_transparent_shadow = transparent_shadow
                             applied_properties.append(f"Raytrace Transmission={transparent_shadow}")
-                        # 视图显示
+                        # Viewport Display
                         if props.use_diffuse_color:
                             material.diffuse_color = diffuse_color
                             applied_properties.append(f"Diffuse Color={diffuse_color[:3]}")
@@ -267,7 +348,7 @@ class MATERIAL_OT_batch_material_helper(Operator):
                         if props.use_display_roughness:
                             material.roughness = display_roughness
                             applied_properties.append(f"Display Roughness={display_roughness}")
-                        # BSDF 属性
+                        # BSDF Properties
                         if material.use_nodes:
                             node_tree = material.node_tree
                             principled_node = next((node for node in node_tree.nodes if node.type == 'BSDF_PRINCIPLED'), None)
@@ -296,6 +377,42 @@ class MATERIAL_OT_batch_material_helper(Operator):
                                         applied_properties.append(f"IOR Level={ior_level_value}")
                                     except (KeyError, IndexError):
                                         self.report({'WARNING'}, "IOR Level input not found in some materials!")
+                                if props.use_emission_color:
+                                    try:
+                                        principled_node.inputs[27].default_value = emission_color
+                                        applied_properties.append(f"Emission Color={emission_color[:3]}")
+                                    except (KeyError, IndexError):
+                                        self.report({'WARNING'}, "Emission Color input not found in some materials!")
+                                if props.use_emission_strength:
+                                    try:
+                                        principled_node.inputs[28].default_value = emission_strength
+                                        applied_properties.append(f"Emission Strength={emission_strength}")
+                                    except (KeyError, IndexError):
+                                        self.report({'WARNING'}, "Emission Strength input not found in some materials!")
+                                if props.use_coat_weight:
+                                    try:
+                                        principled_node.inputs[19].default_value = coat_weight
+                                        applied_properties.append(f"Coat Weight={coat_weight}")
+                                    except (KeyError, IndexError):
+                                        self.report({'WARNING'}, "Coat Weight input not found in some materials!")
+                                if props.use_sheen_weight:
+                                    try:
+                                        principled_node.inputs[24].default_value = sheen_weight
+                                        applied_properties.append(f"Sheen Weight={sheen_weight}")
+                                    except (KeyError, IndexError):
+                                        self.report({'WARNING'}, "Sheen Weight input not found in some materials!")
+                                if props.use_transmission_weight:
+                                    try:
+                                        principled_node.inputs[18].default_value = transmission_weight
+                                        applied_properties.append(f"Transmission Weight={transmission_weight}")
+                                    except (KeyError, IndexError):
+                                        self.report({'WARNING'}, "Transmission Weight input not found in some materials!")
+                                if props.use_subsurface_weight:
+                                    try:
+                                        principled_node.inputs[8].default_value = subsurface_weight
+                                        applied_properties.append(f"Subsurface Weight={subsurface_weight}")
+                                    except (KeyError, IndexError):
+                                        self.report({'WARNING'}, "Subsurface Weight input not found in some materials!")
         
         if applied_properties:
             self.report({'INFO'}, f"Applied to selected objects: {', '.join(applied_properties)}")
@@ -311,7 +428,7 @@ class VIEW3D_PT_batch_material_helper(Panel):
     bl_idname = "VIEW3D_PT_batch_material_helper"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "Material"  # 固定为 "Material"
+    bl_category = "Material"
 
     @classmethod
     def poll(cls, context):
@@ -343,6 +460,24 @@ class VIEW3D_PT_batch_material_helper(Panel):
         row = col.row()
         row.prop(props, "use_ior_level", text="")
         row.prop(props, "batch_ior_level_value", text="IOR Level")
+        row = col.row()
+        row.prop(props, "use_emission_color", text="")
+        row.prop(props, "batch_emission_color", text="Emission Color")
+        row = col.row()
+        row.prop(props, "use_emission_strength", text="")
+        row.prop(props, "batch_emission_strength", text="Emission Strength")
+        row = col.row()
+        row.prop(props, "use_coat_weight", text="")
+        row.prop(props, "batch_coat_weight", text="Coat Weight")
+        row = col.row()
+        row.prop(props, "use_sheen_weight", text="")
+        row.prop(props, "batch_sheen_weight", text="Sheen Weight")
+        row = col.row()
+        row.prop(props, "use_transmission_weight", text="")
+        row.prop(props, "batch_transmission_weight", text="Transmission Weight")
+        row = col.row()
+        row.prop(props, "use_subsurface_weight", text="")
+        row.prop(props, "batch_subsurface_weight", text="Subsurface Weight")
 
         col = layout.column(align=True)
         col.label(text="Material Settings")
@@ -380,20 +515,29 @@ class VIEW3D_PT_batch_material_helper(Panel):
         layout.operator("material.batch_material_helper", text="Apply to Selected Objects")
 
 def register():
-    bpy.utils.register_class(BatchMaterialProperties)
-    bpy.utils.register_class(MATERIAL_OT_batch_material_helper)
-    bpy.utils.register_class(VIEW3D_PT_batch_material_helper)
-    
-    # 注册 PropertyGroup 到 Scene
-    bpy.types.Scene.batch_material_props = bpy.props.PointerProperty(type=BatchMaterialProperties)
+    try:
+        bpy.utils.register_class(BatchMaterialProperties)
+        bpy.utils.register_class(MATERIAL_OT_batch_material_helper)
+        bpy.utils.register_class(VIEW3D_PT_batch_material_helper)
+        
+        # Register PropertyGroup to Scene
+        bpy.types.Scene.batch_material_props = bpy.props.PointerProperty(type=BatchMaterialProperties)
+        print("Batch Material Helper: Properties registered successfully")
+    except Exception as e:
+        print(f"Batch Material Helper: Registration failed - {e}")
 
 def unregister():
-    bpy.utils.unregister_class(MATERIAL_OT_batch_material_helper)
-    bpy.utils.unregister_class(VIEW3D_PT_batch_material_helper)
-    bpy.utils.unregister_class(BatchMaterialProperties)
-    
-    # 移除 PropertyGroup
-    del bpy.types.Scene.batch_material_props
+    try:
+        bpy.utils.unregister_class(MATERIAL_OT_batch_material_helper)
+        bpy.utils.unregister_class(VIEW3D_PT_batch_material_helper)
+        bpy.utils.unregister_class(BatchMaterialProperties)
+        
+        # Remove PropertyGroup
+        if hasattr(bpy.types.Scene, 'batch_material_props'):
+            del bpy.types.Scene.batch_material_props
+        print("Batch Material Helper: Properties unregistered successfully")
+    except Exception as e:
+        print(f"Batch Material Helper: Unregistration failed - {e}")
 
 if __name__ == "__main__":
     register()
