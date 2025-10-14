@@ -1,10 +1,10 @@
 bl_info = {
     "name": "Batch Material Helper",
     "author": "maylog",
-    "version": (1, 0, 2), 
+    "version": (1, 0, 3),  
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > Material",
-    "description": "Batch adjust material and BSDF properties for selected objects, including emission, coat, sheen, transmission, and subsurface",
+    "description": "Batch adjust material and BSDF properties for selected objects, including emission, coat, sheen, transmission, subsurface, and custom split normals clearing",
     "category": "Material",
 }
 
@@ -110,7 +110,6 @@ class BatchMaterialProperties(PropertyGroup):
         description="Apply Emission Strength to selected objects",
         default=False
     )
-    # New: Coat Weight
     batch_coat_weight: FloatProperty(
         name="Coat Weight",
         description="Value to set for coat weight property",
@@ -123,7 +122,6 @@ class BatchMaterialProperties(PropertyGroup):
         description="Apply Coat Weight to selected objects",
         default=False
     )
-    # New: Sheen Weight
     batch_sheen_weight: FloatProperty(
         name="Sheen Weight",
         description="Value to set for sheen weight property",
@@ -136,7 +134,6 @@ class BatchMaterialProperties(PropertyGroup):
         description="Apply Sheen Weight to selected objects",
         default=False
     )
-    # New: Transmission Weight
     batch_transmission_weight: FloatProperty(
         name="Transmission Weight",
         description="Value to set for transmission weight property",
@@ -149,7 +146,6 @@ class BatchMaterialProperties(PropertyGroup):
         description="Apply Transmission Weight to selected objects",
         default=False
     )
-    # New: Subsurface Weight
     batch_subsurface_weight: FloatProperty(
         name="Subsurface Weight",
         description="Value to set for subsurface weight property",
@@ -160,6 +156,12 @@ class BatchMaterialProperties(PropertyGroup):
     use_subsurface_weight: BoolProperty(
         name="Use Subsurface Weight",
         description="Apply Subsurface Weight to selected objects",
+        default=False
+    )
+    # New: Clear Custom Split Normals
+    use_clear_custom_split_normals: BoolProperty(
+        name="Clear Custom Split Normals Data",
+        description="Clear custom split normals data for selected objects",
         default=False
     )
     # Material Settings
@@ -315,6 +317,24 @@ class MATERIAL_OT_batch_material_helper(Operator):
 
         applied_properties = []
         for obj in selected_objects:
+            # New: Clear Custom Split Normals Data
+            if props.use_clear_custom_split_normals:
+                try:
+                    # Store the active object
+                    prev_active = context.active_object
+                    # Set the current object as active
+                    context.view_layer.objects.active = obj
+                    # Switch to object mode if necessary
+                    if obj.mode != 'OBJECT':
+                        bpy.ops.object.mode_set(mode='OBJECT')
+                    # Clear custom split normals
+                    bpy.ops.mesh.customdata_custom_splitnormals_clear()
+                    applied_properties.append("Custom Split Normals Cleared")
+                    # Restore the previous active object
+                    context.view_layer.objects.active = prev_active
+                except Exception as e:
+                    self.report({'WARNING'}, f"Failed to clear custom split normals for {obj.name}: {e}")
+            
             if obj.material_slots:  # Support all object types with material slots
                 for mat_slot in obj.material_slots:
                     material = mat_slot.material
@@ -511,7 +531,13 @@ class VIEW3D_PT_batch_material_helper(Panel):
         row = col.row()
         row.prop(props, "use_display_roughness", text="")
         row.prop(props, "batch_display_roughness", text="Roughness")
-        
+
+        # New: Clear Custom Split Normals Section
+        col = layout.column(align=True)
+        col.label(text="Mesh Properties")
+        row = col.row()
+        row.prop(props, "use_clear_custom_split_normals", text="Clear Custom Split Normals Data")
+
         layout.operator("material.batch_material_helper", text="Apply to Selected Objects")
 
 def register():
