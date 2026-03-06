@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Batch Material Helper",
     "author": "maylog",
-    "version": (1, 0, 4),
+    "version": (1, 0, 5),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > Material",
     "description": "Batch adjust material and BSDF properties for selected objects",
@@ -12,51 +12,49 @@ import bpy
 from bpy.types import Operator, Panel, PropertyGroup
 from bpy.props import FloatProperty, FloatVectorProperty, BoolProperty, EnumProperty
 
+def get_color_space_items(self, context):
+    # Dynamic fetch of available color spaces
+    items = []
+    try:
+        rna_enum = bpy.types.ColorManagedInputColorspaceSettings.bl_rna.properties['name'].enum_items
+        for i, item in enumerate(rna_enum):
+            items.append((item.identifier, item.name, item.description, i))
+    except:
+        items = [('sRGB', "sRGB", ""), ('Non-Color', "Non-Color", "")]
+    return items
+
 class BatchMaterialProperties(PropertyGroup):
     # --- BSDF Properties ---
     batch_base_color: FloatVectorProperty(name="Base Color", subtype='COLOR', default=(1.0, 1.0, 1.0, 1.0), size=4)
     use_base_color: BoolProperty(name="Use Base Color", default=False)
-    
     batch_metallic: FloatProperty(name="Metallic", default=0.0, min=0.0, max=1.0)
     use_metallic: BoolProperty(name="Use Metallic", default=False)
-    
     batch_roughness: FloatProperty(name="Roughness", default=0.5, min=0.0, max=1.0)
     use_roughness: BoolProperty(name="Use Roughness", default=False)
-    
     batch_ior: FloatProperty(name="IOR", default=1.45, min=1.0, max=1000.0)
     use_ior: BoolProperty(name="Use IOR", default=False)
-    
     batch_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0)
     use_alpha: BoolProperty(name="Use Alpha", default=False)
-    
     batch_ior_level: FloatProperty(name="IOR Level", default=0.5, min=0.0, max=1.0)
     use_ior_level: BoolProperty(name="Use IOR Level", default=False)
-    
     batch_emission_color: FloatVectorProperty(name="Emission Color", subtype='COLOR', default=(1.0, 1.0, 1.0, 1.0), size=4)
     use_emission_color: BoolProperty(name="Use Emission Color", default=False)
-    
     batch_emission_strength: FloatProperty(name="Emission Strength", default=0.0, min=0.0)
     use_emission_strength: BoolProperty(name="Use Emission Strength", default=False)
-    
     batch_coat_weight: FloatProperty(name="Coat Weight", default=0.0, min=0.0, max=1.0)
     use_coat_weight: BoolProperty(name="Use Coat Weight", default=False)
-    
     batch_sheen_weight: FloatProperty(name="Sheen Weight", default=0.0, min=0.0, max=1.0)
     use_sheen_weight: BoolProperty(name="Use Sheen Weight", default=False)
-    
     batch_transmission_weight: FloatProperty(name="Transmission Weight", default=0.0, min=0.0, max=1.0)
     use_transmission_weight: BoolProperty(name="Use Transmission Weight", default=False)
-
     batch_subsurface_weight: FloatProperty(name="Subsurface Weight", default=0.0, min=0.0, max=1.0)
     use_subsurface_weight: BoolProperty(name="Use Subsurface Weight", default=False)
-
     batch_subsurface_method: EnumProperty(
         name="Subsurface Method",
         items=[('BURLEY', "Christensen-Burley", ""), ('RANDOM_WALK', "Random Walk", ""), ('RANDOM_WALK_SKIN', "Random Walk (Skin)", "")],
         default='RANDOM_WALK'
     )
     use_subsurface_method: BoolProperty(name="Use Subsurface Method", default=False)
-
     batch_subsurface_scale: FloatProperty(name="Subsurface Scale", default=0.05, min=0.0, unit='LENGTH')
     use_subsurface_scale: BoolProperty(name="Use Subsurface Scale", default=False)
 
@@ -68,35 +66,37 @@ class BatchMaterialProperties(PropertyGroup):
     )
     use_normal_convention: BoolProperty(name="Use Normal Convention", default=False)
 
+    # --- Image Settings ---
+    batch_alpha_mode: EnumProperty(
+        name="Alpha Mode",
+        items=[('STRAIGHT', "Straight", ""), ('PREMUL', "Premultiplied", ""), ('CHANNEL_PACKED', "Channel Packed", ""), ('NONE', "None", "")],
+        default='STRAIGHT'
+    )
+    use_alpha_mode: BoolProperty(name="Use Alpha Mode", default=False)
+    batch_color_space: EnumProperty(name="Color Space", items=get_color_space_items)
+    use_color_space: BoolProperty(name="Use Color Space", default=False)
+
     # --- Material Settings ---
     batch_render_method: EnumProperty(name="Render Method", items=[('DITHERED', "Dithered", ""), ('BLENDED', "Blended", "")], default='DITHERED')
     use_render_method: BoolProperty(name="Use Render Method", default=False)
-    
     batch_displacement_method: EnumProperty(name="Displacement Method", items=[('BUMP', "Bump", ""), ('DISPLACEMENT', "Displacement", ""), ('BOTH', "Both", "")], default='BUMP')
     use_displacement_method: BoolProperty(name="Use Displacement Method", default=False)
-    
     batch_backface_culling: BoolProperty(name="Backface Culling (Camera)", default=False)
     use_backface_culling: BoolProperty(name="Use Backface Culling (Camera)", default=False)
-    
     batch_backface_culling_shadow: BoolProperty(name="Backface Culling (Shadow)", default=False)
     use_backface_culling_shadow: BoolProperty(name="Use Backface Culling (Shadow)", default=False)
-    
     batch_backface_culling_lightprobe: BoolProperty(name="Backface Culling (Lightprobe)", default=False)
     use_backface_culling_lightprobe: BoolProperty(name="Use Backface Culling (Lightprobe)", default=False)
-    
     batch_transparent_shadow: BoolProperty(name="Raytrace Transmission", default=False)
     use_transparent_shadow: BoolProperty(name="Use Raytrace Transmission", default=False)
 
     # --- Viewport ---
     batch_diffuse_color: FloatVectorProperty(name="Diffuse Color", subtype='COLOR', default=(0.8, 0.8, 0.8, 1.0), size=4)
     use_diffuse_color: BoolProperty(name="Use Diffuse Color", default=False)
-    
     batch_display_metallic: FloatProperty(name="Display Metallic", default=0.0, min=0.0, max=1.0)
     use_display_metallic: BoolProperty(name="Use Display Metallic", default=False)
-    
     batch_display_roughness: FloatProperty(name="Display Roughness", default=0.5, min=0.0, max=1.0)
     use_display_roughness: BoolProperty(name="Use Display Roughness", default=False)
-
     use_clear_custom_split_normals: BoolProperty(name="Clear Custom Split Normals Data", default=False)
 
 class MATERIAL_OT_batch_material_helper(Operator):
@@ -106,27 +106,19 @@ class MATERIAL_OT_batch_material_helper(Operator):
 
     def execute(self, context):
         props = context.scene.batch_material_props
-        selected_objects = [obj for obj in context.selected_objects]
+        selected_objects = [obj for obj in context.selected_objects if hasattr(obj, "material_slots")]
         
-        if not selected_objects:
-            self.report({'WARNING'}, "No objects selected!")
-            return {'CANCELLED'}
-
         for obj in selected_objects:
             if props.use_clear_custom_split_normals and obj.type == 'MESH':
                 try:
-                    prev_active = context.active_object
-                    context.view_layer.objects.active = obj
+                    bpy.context.view_layer.objects.active = obj
                     bpy.ops.mesh.customdata_custom_splitnormals_clear()
-                    context.view_layer.objects.active = prev_active
                 except: pass
             
-            if not hasattr(obj, "material_slots"): continue
             for mat_slot in obj.material_slots:
                 mat = mat_slot.material
                 if not mat: continue
                 
-                # Material Settings & Viewport
                 if props.use_render_method: mat.surface_render_method = props.batch_render_method
                 if props.use_displacement_method: mat.displacement_method = props.batch_displacement_method
                 if props.use_backface_culling: mat.use_backface_culling = props.batch_backface_culling
@@ -139,9 +131,16 @@ class MATERIAL_OT_batch_material_helper(Operator):
                 
                 if mat.use_nodes:
                     nodes = mat.node_tree.nodes
+                    if props.use_alpha_mode or props.use_color_space:
+                        for n in nodes:
+                            if n.type == 'TEX_IMAGE' and n.image:
+                                if props.use_alpha_mode: n.image.alpha_mode = props.batch_alpha_mode
+                                if props.use_color_space:
+                                    try: n.image.colorspace_settings.name = props.batch_color_space
+                                    except: pass
+
                     principled = next((n for n in nodes if n.type == 'BSDF_PRINCIPLED'), None)
                     if principled:
-                        # Fixed Mapping (property_suffix, input_name, input_index)
                         mapping = [
                             ("base_color", "Base Color", 0), ("metallic", "Metallic", 1), 
                             ("roughness", "Roughness", 2), ("ior", "IOR", 3), 
@@ -157,17 +156,13 @@ class MATERIAL_OT_batch_material_helper(Operator):
                                     target = principled.inputs.get(node_in) or principled.inputs[idx]
                                     target.default_value = getattr(props, f"batch_{suffix}")
                                 except: pass
-                        
-                        if props.use_subsurface_method:
-                            principled.subsurface_method = props.batch_subsurface_method
+                        if props.use_subsurface_method: principled.subsurface_method = props.batch_subsurface_method
 
                     if props.use_normal_convention:
                         for n in nodes:
                             if n.type == 'NORMAL_MAP':
                                 try: n.convention = props.batch_normal_convention
                                 except: pass
-        
-        self.report({'INFO'}, "Batch material properties updated!")
         return {'FINISHED'}
 
 class VIEW3D_PT_batch_material_helper(Panel):
@@ -180,59 +175,37 @@ class VIEW3D_PT_batch_material_helper(Panel):
     def draw(self, context):
         layout = self.layout
         props = context.scene.batch_material_props
-        layout.label(text="Adjust Material Properties (Selected)")
+        
+        def draw_row(p_use, p_val, label):
+            row = layout.row(align=True)
+            row.prop(props, p_use, text="")
+            row.prop(props, p_val, text=label)
 
-        def draw_section(title, items):
-            col = layout.column(align=True)
-            col.label(text=title)
-            for p_use, p_val, label in items:
-                row = col.row()
-                row.prop(props, p_use, text="")
-                row.prop(props, p_val, text=label)
+        layout.label(text="BSDF Properties", icon='MATERIAL')
+        for item in [("use_base_color", "batch_base_color", "Base Color"), ("use_metallic", "batch_metallic", "Metallic"), ("use_roughness", "batch_roughness", "Roughness"), ("use_ior", "batch_ior", "IOR"), ("use_alpha", "batch_alpha", "Alpha"), ("use_ior_level", "batch_ior_level", "IOR Level"), ("use_emission_color", "batch_emission_color", "Emission Color"), ("use_emission_strength", "batch_emission_strength", "Emission Strength"), ("use_coat_weight", "batch_coat_weight", "Coat Weight"), ("use_sheen_weight", "batch_sheen_weight", "Sheen Weight"), ("use_transmission_weight", "batch_transmission_weight", "Transmission Weight"), ("use_subsurface_weight", "batch_subsurface_weight", "Subsurface Weight"), ("use_subsurface_method", "batch_subsurface_method", "Subsurface Method"), ("use_subsurface_scale", "batch_subsurface_scale", "Subsurface Scale")]:
+            draw_row(*item)
 
-        draw_section("BSDF Properties", [
-            ("use_base_color", "batch_base_color", "Base Color"),
-            ("use_metallic", "batch_metallic", "Metallic"),
-            ("use_roughness", "batch_roughness", "Roughness"),
-            ("use_ior", "batch_ior", "IOR"),
-            ("use_alpha", "batch_alpha", "Alpha"),
-            ("use_ior_level", "batch_ior_level", "IOR Level"),
-            ("use_emission_color", "batch_emission_color", "Emission Color"),
-            ("use_emission_strength", "batch_emission_strength", "Emission Strength"),
-            ("use_coat_weight", "batch_coat_weight", "Coat Weight"),
-            ("use_sheen_weight", "batch_sheen_weight", "Sheen Weight"),
-            ("use_transmission_weight", "batch_transmission_weight", "Transmission Weight"),
-            ("use_subsurface_weight", "batch_subsurface_weight", "Subsurface Weight"),
-            ("use_subsurface_method", "batch_subsurface_method", "Subsurface Method"),
-            ("use_subsurface_scale", "batch_subsurface_scale", "Subsurface Scale"),
-        ])
+        layout.label(text="Material Settings", icon='MATERIAL')
+        for item in [("use_render_method", "batch_render_method", "Render Method"), ("use_displacement_method", "batch_displacement_method", "Displacement Method"), ("use_backface_culling", "batch_backface_culling", "Backface Culling (Camera)"), ("use_backface_culling_shadow", "batch_backface_culling_shadow", "Backface Culling (Shadow)"), ("use_backface_culling_lightprobe", "batch_backface_culling_lightprobe", "Backface Culling (Lightprobe)"), ("use_transparent_shadow", "batch_transparent_shadow", "Raytrace Transmission")]:
+            draw_row(*item)
 
-        draw_section("Material Settings", [
-            ("use_render_method", "batch_render_method", "Render Method"),
-            ("use_displacement_method", "batch_displacement_method", "Displacement Method"),
-            ("use_backface_culling", "batch_backface_culling", "Backface Culling (Camera)"),
-            ("use_backface_culling_shadow", "batch_backface_culling_shadow", "Backface Culling (Shadow)"),
-            ("use_backface_culling_lightprobe", "batch_backface_culling_lightprobe", "Backface Culling (Lightprobe)"),
-            ("use_transparent_shadow", "batch_transparent_shadow", "Raytrace Transmission"),
-        ])
+        layout.label(text="Viewport", icon='MATERIAL')
+        for item in [("use_diffuse_color", "batch_diffuse_color", "Diffuse Color"), ("use_display_metallic", "batch_display_metallic", "Metallic"), ("use_display_roughness", "batch_display_roughness", "Roughness")]:
+            draw_row(*item)
 
-        draw_section("Viewport Display", [
-            ("use_diffuse_color", "batch_diffuse_color", "Diffuse Color"),
-            ("use_display_metallic", "batch_display_metallic", "Metallic"),
-            ("use_display_roughness", "batch_display_roughness", "Roughness"),
-        ])
+        layout.label(text="Node Properties", icon='MATERIAL')
+        draw_row("use_normal_convention", "batch_normal_convention", "Normal Convention")
 
-        col = layout.column(align=True); col.label(text="Mesh Properties")
-        col.row().prop(props, "use_clear_custom_split_normals", text="Clear Custom Split Normals Data")
-
-        col = layout.column(align=True); col.label(text="Node Properties")
-        row = col.row()
-        row.prop(props, "use_normal_convention", text="")
-        row.prop(props, "batch_normal_convention", text="Normal Convention")
-        row.label(text="(5.1+ Only)")
+        layout.label(text="Image Texture Settings", icon='IMAGE_DATA')
+        draw_row("use_alpha_mode", "batch_alpha_mode", "Alpha Mode")
+        draw_row("use_color_space", "batch_color_space", "Color Space")
 
         layout.separator()
-        layout.operator("material.batch_material_helper", text="Apply to Selected Objects")
+        layout.label(text="Mesh Properties", icon='MESH_DATA')
+        layout.prop(props, "use_clear_custom_split_normals", text="Clear Custom Split Normals")
+        
+        layout.separator()
+        layout.operator("material.batch_material_helper", text="Apply to Selected")
 
 def register():
     bpy.utils.register_class(BatchMaterialProperties)
@@ -246,5 +219,5 @@ def unregister():
     bpy.utils.unregister_class(MATERIAL_OT_batch_material_helper)
     bpy.utils.unregister_class(BatchMaterialProperties)
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     register()
