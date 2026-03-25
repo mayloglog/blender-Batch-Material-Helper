@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Batch Material Helper",
     "author": "maylog",
-    "version": (1, 0, 5),
+    "version": (1, 0, 6),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > Material",
     "description": "Batch adjust material and BSDF properties for selected objects",
@@ -99,6 +99,14 @@ class BatchMaterialProperties(PropertyGroup):
     use_display_roughness: BoolProperty(name="Use Display Roughness", default=False)
     use_clear_custom_split_normals: BoolProperty(name="Clear Custom Split Normals Data", default=False)
 
+    # --- UI Foldout States ---
+    show_bsdf: BoolProperty(name="BSDF Properties", default=False)
+    show_mat_settings: BoolProperty(name="Material Settings", default=False)
+    show_viewport: BoolProperty(name="Viewport", default=False)
+    show_nodes: BoolProperty(name="Node Properties", default=False)
+    show_images: BoolProperty(name="Image Texture Settings", default=False)
+    show_mesh: BoolProperty(name="Mesh Properties", default=False)
+
 class MATERIAL_OT_batch_material_helper(Operator):
     bl_idname = "material.batch_material_helper"
     bl_label = "Batch Material Helper"
@@ -176,36 +184,95 @@ class VIEW3D_PT_batch_material_helper(Panel):
         layout = self.layout
         props = context.scene.batch_material_props
         
-        def draw_row(p_use, p_val, label):
-            row = layout.row(align=True)
+        # 1. Apply Button at the Top (Double Height)
+        col = layout.column(align=True)
+        col.scale_y = 2.0
+        col.operator("material.batch_material_helper", text="Apply to Selected", icon='CHECKMARK')
+        layout.separator()
+
+        def draw_row(target_layout, p_use, p_val, label):
+            row = target_layout.row(align=True)
             row.prop(props, p_use, text="")
             row.prop(props, p_val, text=label)
 
-        layout.label(text="BSDF Properties", icon='MATERIAL')
-        for item in [("use_base_color", "batch_base_color", "Base Color"), ("use_metallic", "batch_metallic", "Metallic"), ("use_roughness", "batch_roughness", "Roughness"), ("use_ior", "batch_ior", "IOR"), ("use_alpha", "batch_alpha", "Alpha"), ("use_ior_level", "batch_ior_level", "IOR Level"), ("use_emission_color", "batch_emission_color", "Emission Color"), ("use_emission_strength", "batch_emission_strength", "Emission Strength"), ("use_coat_weight", "batch_coat_weight", "Coat Weight"), ("use_sheen_weight", "batch_sheen_weight", "Sheen Weight"), ("use_transmission_weight", "batch_transmission_weight", "Transmission Weight"), ("use_subsurface_weight", "batch_subsurface_weight", "Subsurface Weight"), ("use_subsurface_method", "batch_subsurface_method", "Subsurface Method"), ("use_subsurface_scale", "batch_subsurface_scale", "Subsurface Scale")]:
-            draw_row(*item)
+        # 2. Collapsible Sections
+        # --- BSDF ---
+        box = layout.box()
+        row = box.row()
+        row.prop(props, "show_bsdf", icon='TRIA_DOWN' if props.show_bsdf else 'TRIA_RIGHT', icon_only=True, emboss=False)
+        row.label(text="BSDF Properties", icon='MATERIAL')
+        if props.show_bsdf:
+            col = box.column(align=True)
+            items = [
+                ("use_base_color", "batch_base_color", "Base Color"), ("use_metallic", "batch_metallic", "Metallic"), 
+                ("use_roughness", "batch_roughness", "Roughness"), ("use_ior", "batch_ior", "IOR"), 
+                ("use_alpha", "batch_alpha", "Alpha"), ("use_ior_level", "batch_ior_level", "IOR Level"), 
+                ("use_emission_color", "batch_emission_color", "Emission Color"), ("use_emission_strength", "batch_emission_strength", "Emission Strength"), 
+                ("use_coat_weight", "batch_coat_weight", "Coat Weight"), ("use_sheen_weight", "batch_sheen_weight", "Sheen Weight"), 
+                ("use_transmission_weight", "batch_transmission_weight", "Transmission Weight"), ("use_subsurface_weight", "batch_subsurface_weight", "Subsurface Weight"), 
+                ("use_subsurface_method", "batch_subsurface_method", "Subsurface Method"), ("use_subsurface_scale", "batch_subsurface_scale", "Subsurface Scale")
+            ]
+            for item in items:
+                draw_row(col, *item)
 
-        layout.label(text="Material Settings", icon='MATERIAL')
-        for item in [("use_render_method", "batch_render_method", "Render Method"), ("use_displacement_method", "batch_displacement_method", "Displacement Method"), ("use_backface_culling", "batch_backface_culling", "Backface Culling (Camera)"), ("use_backface_culling_shadow", "batch_backface_culling_shadow", "Backface Culling (Shadow)"), ("use_backface_culling_lightprobe", "batch_backface_culling_lightprobe", "Backface Culling (Lightprobe)"), ("use_transparent_shadow", "batch_transparent_shadow", "Raytrace Transmission")]:
-            draw_row(*item)
+        # --- Material Settings ---
+        box = layout.box()
+        row = box.row()
+        row.prop(props, "show_mat_settings", icon='TRIA_DOWN' if props.show_mat_settings else 'TRIA_RIGHT', icon_only=True, emboss=False)
+        row.label(text="Material Settings", icon='MATERIAL')
+        if props.show_mat_settings:
+            col = box.column(align=True)
+            items = [
+                ("use_render_method", "batch_render_method", "Render Method"), ("use_displacement_method", "batch_displacement_method", "Displacement Method"), 
+                ("use_backface_culling", "batch_backface_culling", "Backface Culling (Camera)"), ("use_backface_culling_shadow", "batch_backface_culling_shadow", "Backface Culling (Shadow)"), 
+                ("use_backface_culling_lightprobe", "batch_backface_culling_lightprobe", "Backface Culling (Lightprobe)"), ("use_transparent_shadow", "batch_transparent_shadow", "Raytrace Transmission")
+            ]
+            for item in items:
+                draw_row(col, *item)
 
-        layout.label(text="Viewport", icon='MATERIAL')
-        for item in [("use_diffuse_color", "batch_diffuse_color", "Diffuse Color"), ("use_display_metallic", "batch_display_metallic", "Metallic"), ("use_display_roughness", "batch_display_roughness", "Roughness")]:
-            draw_row(*item)
+        # --- Viewport ---
+        box = layout.box()
+        row = box.row()
+        row.prop(props, "show_viewport", icon='TRIA_DOWN' if props.show_viewport else 'TRIA_RIGHT', icon_only=True, emboss=False)
+        row.label(text="Viewport", icon='MATERIAL')
+        if props.show_viewport:
+            col = box.column(align=True)
+            items = [
+                ("use_diffuse_color", "batch_diffuse_color", "Diffuse Color"), ("use_display_metallic", "batch_display_metallic", "Metallic"), 
+                ("use_display_roughness", "batch_display_roughness", "Roughness")
+            ]
+            for item in items:
+                draw_row(col, *item)
 
-        layout.label(text="Node Properties", icon='MATERIAL')
-        draw_row("use_normal_convention", "batch_normal_convention", "Normal Convention")
+        # --- Node Properties ---
+        box = layout.box()
+        row = box.row()
+        row.prop(props, "show_nodes", icon='TRIA_DOWN' if props.show_nodes else 'TRIA_RIGHT', icon_only=True, emboss=False)
+        row.label(text="Node Properties", icon='NODETREE')
+        if props.show_nodes:
+            col = box.column(align=True)
+            draw_row(col, "use_normal_convention", "batch_normal_convention", "Normal Y")
+            sub = col.column(align=True)
+            sub.active = props.use_normal_convention
+            sub.label(text="Requires Blender 5.1+", icon='ERROR')
 
-        layout.label(text="Image Texture Settings", icon='IMAGE_DATA')
-        draw_row("use_alpha_mode", "batch_alpha_mode", "Alpha Mode")
-        draw_row("use_color_space", "batch_color_space", "Color Space")
+        # --- Image Settings ---
+        box = layout.box()
+        row = box.row()
+        row.prop(props, "show_images", icon='TRIA_DOWN' if props.show_images else 'TRIA_RIGHT', icon_only=True, emboss=False)
+        row.label(text="Image Texture Settings", icon='IMAGE_DATA')
+        if props.show_images:
+            col = box.column(align=True)
+            draw_row(col, "use_alpha_mode", "batch_alpha_mode", "Alpha Mode")
+            draw_row(col, "use_color_space", "batch_color_space", "Color Space")
 
-        layout.separator()
-        layout.label(text="Mesh Properties", icon='MESH_DATA')
-        layout.prop(props, "use_clear_custom_split_normals", text="Clear Custom Split Normals")
-        
-        layout.separator()
-        layout.operator("material.batch_material_helper", text="Apply to Selected")
+        # --- Mesh Properties ---
+        box = layout.box()
+        row = box.row()
+        row.prop(props, "show_mesh", icon='TRIA_DOWN' if props.show_mesh else 'TRIA_RIGHT', icon_only=True, emboss=False)
+        row.label(text="Mesh Properties", icon='MESH_DATA')
+        if props.show_mesh:
+            box.prop(props, "use_clear_custom_split_normals", text="Clear Custom Split Normals")
 
 def register():
     bpy.utils.register_class(BatchMaterialProperties)
