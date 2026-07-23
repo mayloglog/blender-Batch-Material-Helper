@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Batch Material Helper",
     "author": "maylog",
-    "version": (1, 0, 6),
+    "version": (1, 0, 7),
     "blender": (4, 2, 0),
     "location": "View3D > Sidebar > Material",
     "description": "Batch adjust material and BSDF properties for selected objects",
@@ -11,6 +11,8 @@ bl_info = {
 import bpy
 from bpy.types import Operator, Panel, PropertyGroup
 from bpy.props import FloatProperty, FloatVectorProperty, BoolProperty, EnumProperty
+from .translations import translations_dict
+from bpy.app.translations import pgettext_iface
 
 def get_color_space_items(self, context):
     # Dynamic fetch of available color spaces
@@ -51,7 +53,7 @@ class BatchMaterialProperties(PropertyGroup):
     use_subsurface_weight: BoolProperty(name="Use Subsurface Weight", default=False)
     batch_subsurface_method: EnumProperty(
         name="Subsurface Method",
-        items=[('BURLEY', "Christensen-Burley", ""), ('RANDOM_WALK', "Random Walk", ""), ('RANDOM_WALK_SKIN', "Random Walk (Skin)", "")],
+        items=[('BURLEY', "Christensen-Burley", ""), ('RANDOM_WALK', "Random Walk", ""), ('RANDOM_WALK_SKIN', "Random Walk (Skin)", ""), ('RANDOM_WALK_TRADITIONAL', "Random Walk (Legacy)", "")],
         default='RANDOM_WALK'
     )
     use_subsurface_method: BoolProperty(name="Use Subsurface Method", default=False)
@@ -187,7 +189,7 @@ class VIEW3D_PT_batch_material_helper(Panel):
         # 1. Apply Button at the Top (Double Height)
         col = layout.column(align=True)
         col.scale_y = 2.0
-        col.operator("material.batch_material_helper", text="Apply to Selected", icon='CHECKMARK')
+        col.operator("material.batch_material_helper", text=pgettext_iface("Apply to Selected"), icon='CHECKMARK')
         layout.separator()
 
         def draw_row(target_layout, p_use, p_val, label):
@@ -275,12 +277,14 @@ class VIEW3D_PT_batch_material_helper(Panel):
             box.prop(props, "use_clear_custom_split_normals", text="Clear Custom Split Normals")
 
 def register():
+    bpy.app.translations.register(__name__, translations_dict)
     bpy.utils.register_class(BatchMaterialProperties)
     bpy.utils.register_class(MATERIAL_OT_batch_material_helper)
     bpy.utils.register_class(VIEW3D_PT_batch_material_helper)
     bpy.types.Scene.batch_material_props = bpy.props.PointerProperty(type=BatchMaterialProperties)
 
 def unregister():
+    bpy.app.translations.unregister(__name__)
     if hasattr(bpy.types.Scene, 'batch_material_props'): del bpy.types.Scene.batch_material_props
     bpy.utils.unregister_class(VIEW3D_PT_batch_material_helper)
     bpy.utils.unregister_class(MATERIAL_OT_batch_material_helper)
